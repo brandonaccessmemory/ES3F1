@@ -104,15 +104,15 @@ assign {red, blu, gre} = i_vid_data;
 //    kernel[0] <= kernel[1];
 //    kernel[1] <= kernel[2];
 //    reading from the buffer 
-//    kernel[2] <= bram_out;
+    //    kernel[2] <= data_rd_1;
 
 //    kernel[3] <= kernel[4];
 //    kernel[4] <= kernel[5];
-//    kernel[5] <= bram_out_2;
+    //    kernel[5] <= data_rd_2;
     
 //    kernel[6] <= kernel[7];
 //    kernel[7] <= kernel[8];
-//    kernel[8] <= i_data;
+    //    kernel[8] <= i_vid_data;
 //    blurring , implement switches for different operations
 //    kernel_output <= kernel[0]/9 + kernel[1]/9 + kernel[2]/9 + kernel[3]/9 + kernel[4]/9 + kernel[5]/9 + kernel[6]/9 + kernel[7]/9 + kernel[8]/9;
 //end
@@ -135,22 +135,40 @@ always @ (posedge clk) begin
             o_vid_hsync <= i_vid_hsync;
             o_vid_vsync <= i_vid_vsync; 
             o_vid_VDE <= i_vid_VDE;
-            
+            // new frame 
+            if (i_vid_vsync == 1) 
+                counter <= 0;
             // loop from the start 
             if (addr_wr_1 >= 1919) 
                 addr_wr_1 <= 0; 
             if (addr_wr_2 >= 1919) 
                 addr_wr_2 <= 0; 
-            if (addr_wr_3 >= 1919)
-                addr_wr_3 <= 0; 
-           
+
+            // buffer next row of data simultaneously 
+            data_wr_1 <= data_rd_2; 
+            data_wr_2 <= i_vid_data; 
+            // update the read
+            addr_wr_1 <= addr_wr_1 + 1;
+            addr_wr_2 <= addr_wr_2 + 1; 
+        end else begin 
+            // buffer first row 
+            if (counter < 2022) begin 
+                data_wr_1 <= i_vid_data; 
+                addr_wr_1 <= addr_wr_1 + 1;
+            // buffer second row 
+            end else begin 
+                data_wr_2 <= i_vid_data; 
+                addr_wr_2 <= addr_wr_2 + 1; 
+            end 
+            counter <= counter + 1; 
+        end 
+            
+            
+            
             
             // calculate cur_pixel value
             // order of 1,2,3 / 2,3,1 / 3,1,2 
-            // request the read
-            addr_wr_1 <= addr_wr_1 + 1;
-            o_vid_data <= data_rd_1; 
-            // buffer next row of data simultaneously 
+           
             
 // single pixel operations 
 //            case(sw)
