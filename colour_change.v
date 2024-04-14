@@ -26,8 +26,8 @@ module colour_change #
 )
 (
     input  wire                   clk,
-    input  wire                   clk5x,
     input  wire                   n_rst,
+
 
     /*
      * Pixel inputs
@@ -44,6 +44,7 @@ module colour_change #
     output reg                  o_vid_hsync,
     output reg                  o_vid_vsync,
     output reg                  o_vid_VDE,
+    output wire [215:0] win,
     
     /*
      * Control
@@ -53,115 +54,62 @@ module colour_change #
 
 wire enable;
 
-reg [2:0] mode;
+reg mode;
 
 
-// 3 adresses for 3 row buffers
-reg [10:0] addr1;
-reg [10:0] addr2;
-reg [10:0] addr3;
+// 2 adresses for 2 row buffers
+reg [10:0] addrw1;
+reg [10:0] addrw2;
+
+
 
 reg [10:0] hcount;
-reg [10:0] vcount;
+
 
 // 3 output pix for 3 row buffers
 wire [DATA_WIDTH-1:0] ram_pix1;
 wire [DATA_WIDTH-1:0] ram_pix2;
-wire [DATA_WIDTH-1:0] ram_pix3;
+wire [DATA_WIDTH-1:0] data_rd_1;
+wire [DATA_WIDTH-1:0] data_rd_2;
+
 
 //data in  addr
 reg [DATA_WIDTH-1:0] dina;
 
-wire wea1; 
-wire wea2; 
-wire wea3; 
+reg wea1; 
+reg wea2; 
+
 
 reg [7:0] gaussian [2:0][2:0];
+reg [23:0] window [8:0];
+
 
 wire [7:0] red;
 wire [7:0] blu;
 wire [7:0] gre;
+reg [7:0] tred;
+reg [7:0] tblu;
+reg [7:0] tgre;
 reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
 reg [9:0] grey;
 
 initial begin
+    wea1 <= 1;
+    wea1 <= 0;
 //    gaussian[0][0] = 1; gaussian[0][1] = 2; gaussian[0][2] = 1;
 //    gaussian[1][0] = 1; gaussian[1][1] = 4; gaussian[1][2] = 1;
 //    gaussian[2][0] = 1; gaussian[2][1] = 2; gaussian[2][2] = 1;
-    mode <= 3'd0;
 end
 
 assign {red, blu, gre} = i_vid_data;
+assign win =   {window[0], window[1], window[2],
+                window[3], window[4], window[5],
+                window[6], window[7], window[8]};
 
-always @(posedge clk5x) begin
-//    if(!n_rst) begin
-//        o_vid_hsync <= 0;
-//        o_vid_vsync <= 0; 
-//        o_vid_VDE <= 0;
-//        o_vid_data <= 0;
-//        hcount <= 0;
-//        vcount <= 0;
-//    end
-    case(mode)
-        3'd0: if(1) begin
-            mode <=3'd1; 
-        end
-           
-        3'd1: if(1) begin
-            mode <=3'd2;
-        end
-            
-        3'd2: if(1) begin
-            mode <=3'd3;
-        end
-        
-        3'd3: if(1) begin
-            mode <=3'd4;
-        end
-           
-        3'd4: if(1) begin
-//            if(!n_rst) begin
-//                o_vid_hsync <= 0;
-//                o_vid_vsync <= 0; 
-//                o_vid_VDE <= 0;
-//                o_vid_data <= 0;
-//                hcount <= 0;
-//                vcount <= 0;
-//            end
-//            else begin
-//                o_vid_hsync <= i_vid_hsync;
-//                o_vid_vsync <= i_vid_vsync; 
-//                o_vid_VDE <= i_vid_VDE;
-        
-//                case(sw)
-//                    4'b0001:
-//                        o_vid_data <= {blu, red, gre};
-//                    4'b0010:
-//                        o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
-//                    4'b1001:
-//                    begin
-//                        re <= {2'd0,red};
-//                        bl <= {2'd0,blu};
-//                        gr <= {2'd0,gre};
-//                        grey <= (re+bl+gr)/8'd3;
-//                        o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
-//                    end
-        
-                        
-//                    default:
-//                        o_vid_data <= i_vid_data;
-//                endcase
-//            end
-            
-            mode <=3'd0;
-        end
-           
-           
-    endcase
-//    clk_count <= clk_count + 1'b1;
-end
+assign data_rd_1 = (!mode) ? ram_pix1 : ram_pix2;
+assign data_rd_2 = (mode) ? ram_pix1 : ram_pix2;
 
 always @ (posedge clk) begin
     if(!n_rst) begin
@@ -170,37 +118,100 @@ always @ (posedge clk) begin
         o_vid_VDE <= 0;
         o_vid_data <= 0;
         hcount <= 0;
-        vcount <= 0;
+
     end
     else begin
         o_vid_hsync <= i_vid_hsync;
         o_vid_vsync <= i_vid_vsync; 
         o_vid_VDE <= i_vid_VDE;
-//        $display("hsync %d", o_vid_hsync);
-//        $display("vsync %d", o_vid_vsync);
-//        $display("vde %d", o_vid_VDE);
-//        o_vid_data <= {blu, red, gre};
+        
+        
+        if (hcount >= 2022) begin
+            hcount <= 0;
+            mode <= ! mode;
+            wea1 <= wea2;
+            wea2 <= wea1;
+        end
+        
+        
+        //changing row representation of row buffer
+        
+        
+        
+        
+        //window to apply kernel to
+        
+        window[0] <= window[1];
+        window[1] <= window[2];
+        window[2] <= data_rd_1;
+    
+        window[3] <= window[4];
+        window[4] <= window[5];
+        window[5] <= data_rd_2;
+        
+        window[6] <= window[7];
+        window[7] <= window[8];
+        window[8] <= i_vid_data;
+        
+        
+
         case(sw)
             4'b0001:
                 o_vid_data <= {blu, red, gre};
-            4'b0011:
-                o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
             4'b0010:
+                o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
+            4'b0011:
             begin
                 re <= {2'd0,red};
                 bl <= {2'd0,blu};
                 gr <= {2'd0,gre};
-                grey <= (re+bl+gr)/8'd3;
+                grey <= (re+bl+gr)>>3;
                 o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
             end
-//            4'b0100:
-//            begin
+            4'b0100:
+            begin
+                tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
+                        window[3][7:0]/9 + window[4][7:0]/9 + window[5][7:0]/9 + 
+                        window[6][7:0]/9 + window[7][7:0]/9 + window[8][7:0]/9;
                 
-            
-            
-//                o_vid_data <= i_vid_data;
-//            end
+                tblu <= window[0][15:8]/9 + window[1][15:8]/9 + window[2][15:8]/9 +
+                        window[3][15:8]/9 + window[4][15:8]/9 + window[5][15:8]/9 +
+                        window[6][15:8]/9 + window[7][15:8]/9 + window[8][15:8]/9;
                 
+                tred <= window[0][23:16]/9 + window[1][23:16]/9 + window[2][23:16]/9 + 
+                        window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
+                        window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
+                        
+                 o_vid_data <= {tred, tblu, tgre};
+            end
+            4'b0101:
+            begin
+                tgre <= window[0][7:0] - window[2][7:0] + 
+                        window[3][7:0]*2 - window[5][7:0]*2 + 
+                        window[6][7:0] - window[8][7:0];
+                
+                tblu <= window[0][15:8] - window[2][15:8] +
+                        window[3][15:8]*2 - window[5][15:8]*2 +
+                        window[6][15:8] - window[8][15:8];
+                
+                tred <= window[0][23:16] - window[2][23:16] + 
+                        window[3][23:16]*2 - window[5][23:16]*2 + 
+                        window[6][23:16] - window[8][23:16];
+                        
+                        
+                        
+                o_vid_data <= {tred>>3, tblu>>3, tgre>>3};
+            end
+            4'b0110:
+            begin
+                tgre <= window[4][7:0];
+                
+                tblu <= window[4][15:8];
+                
+                tred <= window[4][23:16];
+                
+                 o_vid_data <= {tred, tblu, tgre};
+            end
             default:
                 o_vid_data <= i_vid_data;
         endcase
@@ -211,26 +222,23 @@ always @ (posedge clk) begin
 end
 
 blk_mem_gen_0 inst0(
-    .clka(clk),
-    .wea(wea1),
-    .addra(addr1),
-    .dina(dina),
-    .douta(ram_pix1)
+        .clka(clk),
+        .clkb(clk),
+        .wea(wea1),
+        .addra(addrw1),
+        .dina(i_vid_data),
+        .addrb(addrw1+2),
+        .doutb(ram_pix1)
 );
-
 blk_mem_gen_1 inst1(
-    .clka(clk),
-    .wea(wea2),
-    .addra(addr2),
-    .dina(dina),
-    .douta(ram_pix2)
+        .clka(clk),
+        .clkb(clk),
+        .wea(wea2),
+        .addra(addrw2),
+        .dina(i_vid_data),
+        .addrb(addrw1+2),
+        .doutb(ram_pix2)
 );
 
-blk_mem_gen_2 inst2(
-    .clka(clk),
-    .wea(wea3),
-    .addra(addr3),
-    .dina(dina),
-    .douta(ram_pix3)
-);
+
 endmodule
