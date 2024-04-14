@@ -46,6 +46,8 @@ module colour_change #
     output reg                  o_vid_VDE,
     output wire [215:0] win,
     
+    output reg [10:0] hcount,
+    
     /*
      * Control
      */
@@ -58,8 +60,8 @@ reg mode;
 
 
 // 2 adresses for 2 row buffers
-reg [10:0] addrw1;
-reg [10:0] addrw2;
+//reg [10:0] addrw1;
+//reg [10:0] addrw2;
 
 
 
@@ -77,7 +79,7 @@ wire [DATA_WIDTH-1:0] data_rd_2;
 reg [DATA_WIDTH-1:0] dina;
 
 reg wea1; 
-reg wea2; 
+wire wea2; 
 
 
 reg [7:0] gaussian [2:0][2:0];
@@ -95,18 +97,21 @@ reg [9:0] bl;
 reg [9:0] gr;
 reg [9:0] grey;
 
+
 initial begin
     wea1 <= 1;
-    wea1 <= 0;
-//    gaussian[0][0] = 1; gaussian[0][1] = 2; gaussian[0][2] = 1;
-//    gaussian[1][0] = 1; gaussian[1][1] = 4; gaussian[1][2] = 1;
-//    gaussian[2][0] = 1; gaussian[2][1] = 2; gaussian[2][2] = 1;
+//    wea2 <= 0;
+////    gaussian[0][0] = 1; gaussian[0][1] = 2; gaussian[0][2] = 1;
+////    gaussian[1][0] = 1; gaussian[1][1] = 4; gaussian[1][2] = 1;
+////    gaussian[2][0] = 1; gaussian[2][1] = 2; gaussian[2][2] = 1;
 end
 
 assign {red, blu, gre} = i_vid_data;
 assign win =   {window[0], window[1], window[2],
                 window[3], window[4], window[5],
                 window[6], window[7], window[8]};
+                
+//assign wea2 = !wea1;
 
 assign data_rd_1 = (!mode) ? ram_pix1 : ram_pix2;
 assign data_rd_2 = (mode) ? ram_pix1 : ram_pix2;
@@ -129,9 +134,10 @@ always @ (posedge clk) begin
         if (hcount >= 2022) begin
             hcount <= 0;
             mode <= ! mode;
-            wea1 <= wea2;
-            wea2 <= wea1;
-        end
+            wea1 <= !wea1;
+
+        end else
+            hcount <= hcount + 1;
         
         
         //changing row representation of row buffer
@@ -225,18 +231,18 @@ blk_mem_gen_0 inst0(
         .clka(clk),
         .clkb(clk),
         .wea(wea1),
-        .addra(addrw1),
+        .addra(hcount),
         .dina(i_vid_data),
-        .addrb(addrw1+2),
+        .addrb(hcount-2),
         .doutb(ram_pix1)
 );
 blk_mem_gen_1 inst1(
         .clka(clk),
         .clkb(clk),
-        .wea(wea2),
-        .addra(addrw2),
+        .wea(!wea1),
+        .addra(hcount),
         .dina(i_vid_data),
-        .addrb(addrw1+2),
+        .addrb(hcount-2),
         .doutb(ram_pix2)
 );
 
