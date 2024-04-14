@@ -251,7 +251,7 @@ blk_mem_gen_2 inst2(
     .addra(addr_wr_3),
     .dina(data_wr_3),
     .clkb(clk),
-    .addrb(addr_wr_3 + 3),
+    .addrb(addr_wr_3 +2),
     .doutb(data_rd_3)
 );
 
