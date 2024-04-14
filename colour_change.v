@@ -47,6 +47,9 @@ module colour_change #
     output wire [215:0] win,
     
     output reg [10:0] hcount,
+    output reg [DATA_WIDTH-1:0] data_rd_1,
+    output reg [DATA_WIDTH-1:0] data_rd_2,
+    
     
     /*
      * Control
@@ -69,10 +72,9 @@ reg [10:0] hcount;
 
 
 // 3 output pix for 3 row buffers
+
 wire [DATA_WIDTH-1:0] ram_pix1;
 wire [DATA_WIDTH-1:0] ram_pix2;
-wire [DATA_WIDTH-1:0] data_rd_1;
-wire [DATA_WIDTH-1:0] data_rd_2;
 
 
 //data in  addr
@@ -100,6 +102,7 @@ reg [9:0] grey;
 
 initial begin
     wea1 <= 1;
+    mode <= 0;
 //    wea2 <= 0;
 ////    gaussian[0][0] = 1; gaussian[0][1] = 2; gaussian[0][2] = 1;
 ////    gaussian[1][0] = 1; gaussian[1][1] = 4; gaussian[1][2] = 1;
@@ -113,8 +116,7 @@ assign win =   {window[0], window[1], window[2],
                 
 //assign wea2 = !wea1;
 
-assign data_rd_1 = (!mode) ? ram_pix1 : ram_pix2;
-assign data_rd_2 = (mode) ? ram_pix1 : ram_pix2;
+
 
 always @ (posedge clk) begin
     if(!n_rst) begin
@@ -138,7 +140,16 @@ always @ (posedge clk) begin
 
         end else
             hcount <= hcount + 1;
-        
+            
+            
+        if (!mode) begin
+            data_rd_1 <= ram_pix1;
+            data_rd_2 <= ram_pix2;
+        end
+        else begin
+            data_rd_1 <= ram_pix2;
+            data_rd_2 <= ram_pix1;
+        end
         
         //changing row representation of row buffer
         
@@ -218,6 +229,20 @@ always @ (posedge clk) begin
                 
                  o_vid_data <= {tred, tblu, tgre};
             end
+            
+            4'b0111:
+            begin
+                tgre <= window[6][7:0] - window[8][7:0];
+                
+                tblu <= window[6][15:8] - window[8][15:8];
+                
+                tred <= window[6][23:16] - window[8][23:16];
+                        
+                        
+                        
+                o_vid_data <= {tred>>1, tblu>>1, tgre>>1};
+            end
+            
             default:
                 o_vid_data <= i_vid_data;
         endcase
