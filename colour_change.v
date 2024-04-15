@@ -46,7 +46,7 @@ module colour_change #
     output reg                  o_vid_VDE,
     output wire [215:0] win,
     
-    output reg [10:0] hcount,
+    output reg [11:0] hcount,
     output reg [DATA_WIDTH-1:0] data_rd_1,
     output reg [DATA_WIDTH-1:0] data_rd_2,
     
@@ -68,7 +68,7 @@ reg mode;
 
 
 
-reg [10:0] hcount;
+//reg [11:0] hcount;
 
 
 // 3 output pix for 3 row buffers
@@ -133,9 +133,9 @@ always @ (posedge clk) begin
         o_vid_VDE <= i_vid_VDE;
         
         
-        if (hcount >= 2022) begin
+        if (hcount >= 2200) begin
             hcount <= 0;
-            mode <= ! mode;
+            mode <= !mode;
             wea1 <= !wea1;
 
         end else
@@ -258,7 +258,7 @@ blk_mem_gen_0 inst0(
         .wea(wea1),
         .addra(hcount),
         .dina(i_vid_data),
-        .addrb(hcount-2),
+        .addrb(hcount+2),
         .doutb(ram_pix1)
 );
 blk_mem_gen_1 inst1(
@@ -267,7 +267,7 @@ blk_mem_gen_1 inst1(
         .wea(!wea1),
         .addra(hcount),
         .dina(i_vid_data),
-        .addrb(hcount-2),
+        .addrb(hcount+2),
         .doutb(ram_pix2)
 );
 
