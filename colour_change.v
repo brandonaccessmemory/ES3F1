@@ -47,8 +47,8 @@ module colour_change #
     output wire [215:0] win,
     
     output reg [11:0] hcount,
-    output reg [DATA_WIDTH-1:0] data_rd_1,
-    output reg [DATA_WIDTH-1:0] data_rd_2,
+    output wire [DATA_WIDTH-1:0] ram_pix1,
+    output wire [DATA_WIDTH-1:0] ram_pix2,
     
     
     /*
@@ -73,8 +73,8 @@ reg mode;
 
 // 3 output pix for 3 row buffers
 
-wire [DATA_WIDTH-1:0] ram_pix1;
-wire [DATA_WIDTH-1:0] ram_pix2;
+//wire [DATA_WIDTH-1:0] ram_pix1;
+//wire [DATA_WIDTH-1:0] ram_pix2;
 
 
 //data in  addr
@@ -91,9 +91,9 @@ reg [23:0] window [8:0];
 wire [7:0] red;
 wire [7:0] blu;
 wire [7:0] gre;
-reg [7:0] tred;
-reg [7:0] tblu;
-reg [7:0] tgre;
+reg [10:0] tred;
+reg [10:0] tblu;
+reg [10:0] tgre;
 reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
@@ -125,6 +125,7 @@ always @ (posedge clk) begin
         o_vid_VDE <= 0;
         o_vid_data <= 0;
         hcount <= 0;
+        
 
     end
     else begin
@@ -133,23 +134,23 @@ always @ (posedge clk) begin
         o_vid_VDE <= i_vid_VDE;
         
         
-        if (hcount >= 2200) begin
+        if (hcount >= 2199) begin
             hcount <= 0;
-            mode <= !mode;
-            wea1 <= !wea1;
+//            mode <= !mode;
+//            wea1 <= !wea1;
 
         end else
             hcount <= hcount + 1;
             
             
-        if (!mode) begin
-            data_rd_1 <= ram_pix1;
-            data_rd_2 <= ram_pix2;
-        end
-        else begin
-            data_rd_1 <= ram_pix2;
-            data_rd_2 <= ram_pix1;
-        end
+//        if (!mode) begin
+//            data_rd_1 <= ram_pix1;
+//            data_rd_2 <= ram_pix2;
+//        end
+//        else begin
+//            data_rd_1 <= ram_pix2;
+//            data_rd_2 <= ram_pix1;
+//        end
         
         //changing row representation of row buffer
         
@@ -160,11 +161,11 @@ always @ (posedge clk) begin
         
         window[0] <= window[1];
         window[1] <= window[2];
-        window[2] <= data_rd_1;
+        window[2] <= ram_pix2;
     
         window[3] <= window[4];
         window[4] <= window[5];
-        window[5] <= data_rd_2;
+        window[5] <= ram_pix1;
         
         window[6] <= window[7];
         window[7] <= window[8];
@@ -173,11 +174,13 @@ always @ (posedge clk) begin
         
 
         case(sw)
-            4'b0001:
+            4'b0001: // blur red swap
                 o_vid_data <= {blu, red, gre};
-            4'b0010:
+            
+            4'b0010: // negative
                 o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
-            4'b0011:
+            
+            4'b0011: // greyscale
             begin
                 re <= {2'd0,red};
                 bl <= {2'd0,blu};
@@ -185,7 +188,8 @@ always @ (posedge clk) begin
                 grey <= (re+bl+gr)>>3;
                 o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
             end
-            4'b0100:
+            
+            4'b0100: // 3x3 blur
             begin
                 tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
                         window[3][7:0]/9 + window[4][7:0]/9 + window[5][7:0]/9 + 
@@ -199,9 +203,10 @@ always @ (posedge clk) begin
                         window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
                         window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
                         
-                 o_vid_data <= {tred, tblu, tgre};
+                 o_vid_data <= {tred[7:0], tblu[7:0], tgre[7:0]};
             end
-            4'b0101:
+            
+            4'b0101: //vert sobel gy
             begin
                 tgre <= window[0][7:0] - window[2][7:0] + 
                         window[3][7:0]*2 - window[5][7:0]*2 + 
@@ -215,11 +220,13 @@ always @ (posedge clk) begin
                         window[3][23:16]*2 - window[5][23:16]*2 + 
                         window[6][23:16] - window[8][23:16];
                         
-                        
-                        
-                o_vid_data <= {tred>>3, tblu>>3, tgre>>3};
+                re <= tred>>2;
+                bl <= tblu>>2;
+                gr <= tgre>>2;
+                o_vid_data <= {re[7:0], bl[7:0], gr[7:0]};
             end
-            4'b0110:
+            
+            4'b0110: // normal draw using centre pix
             begin
                 tgre <= window[4][7:0];
                 
@@ -227,20 +234,57 @@ always @ (posedge clk) begin
                 
                 tred <= window[4][23:16];
                 
-                 o_vid_data <= {tred, tblu, tgre};
+                 o_vid_data <= {tred[7:0], tblu[7:0], tgre[7:0]};
             end
             
-            4'b0111:
+            4'b0111: // horisontal sobel gy
             begin
-                tgre <= window[6][7:0] - window[8][7:0];
+                tgre <= window[0][7:0] + 2*window[1][7:0] + window[2][7:0] 
+                       - window[6][7:0] - 2*window[7][7:0] - window[8][7:0];
                 
-                tblu <= window[6][15:8] - window[8][15:8];
+                tblu <= window[0][15:8] + 2*window[1][15:8] + window[2][15:8]
+                       - window[6][15:8] - 2*window[7][15:8] - window[8][15:8];
                 
-                tred <= window[6][23:16] - window[8][23:16];
+                tred <= window[0][23:16] + 2*window[1][23:16] + window[2][23:16]  
+                       - window[6][23:16] - 2*window[7][23:16] - window[8][23:16];
                         
                         
                         
-                o_vid_data <= {tred>>1, tblu>>1, tgre>>1};
+                re <= tred>>2;
+                bl <= tblu>>2;
+                gr <= tgre>>2;
+                o_vid_data <= {re[7:0], bl[7:0], gr[7:0]};
+            end
+            
+            4'b1110: // normal draw using centre pix
+            begin
+                tgre <= window[1][7:0];
+                
+                tblu <= window[1][15:8];
+                
+                tred <= window[1][23:16];
+                
+                 o_vid_data <= {tred[7:0], tblu[7:0], tgre[7:0]};
+            end
+            
+            4'b1000: // laplacian
+            begin
+                tgre <=                  window[1][7:0]                  + 
+                        window[3][7:0] - 4*window[4][7:0] + window[5][7:0] + 
+                                         window[7][7:0]                   ;
+                
+                tblu <=                  window[1][15:8]                  + 
+                        window[3][15:8] - 4*window[4][15:8] + window[5][15:8] + 
+                                         window[7][15:8]                   ;
+                
+                tred <=                  window[1][23:16]                  + 
+                        window[3][23:16] - 4*window[4][23:16] + window[5][23:16] + 
+                                         window[7][23:16]                   ;
+                        
+                re <= tred>>2;
+                bl <= tblu>>2;
+                gr <= tgre>>2;
+                o_vid_data <= {re[7:0], bl[7:0], gr[7:0]};
             end
             
             default:
@@ -264,9 +308,9 @@ blk_mem_gen_0 inst0(
 blk_mem_gen_1 inst1(
         .clka(clk),
         .clkb(clk),
-        .wea(!wea1),
+        .wea(wea1),
         .addra(hcount),
-        .dina(i_vid_data),
+        .dina(ram_pix1),
         .addrb(hcount+2),
         .doutb(ram_pix2)
 );
