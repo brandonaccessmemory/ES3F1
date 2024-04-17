@@ -28,6 +28,7 @@ module colour_change #
     input  wire                   clk,
     input  wire                   n_rst,
 
+
     /*
      * Pixel inputs
      */
@@ -43,6 +44,12 @@ module colour_change #
     output reg                  o_vid_hsync,
     output reg                  o_vid_vsync,
     output reg                  o_vid_VDE,
+    output wire [215:0] win,
+    
+    output reg [11:0] hcount,
+    output reg [DATA_WIDTH-1:0] data_rd_1,
+    output reg [DATA_WIDTH-1:0] data_rd_2,
+    
     
     /*
      * Control
@@ -52,208 +59,241 @@ module colour_change #
 
 wire enable;
 
-// 3 adresses for 3 row buffers
-reg [10:0] addr_wr_1;
-reg [10:0] addr_wr_2;
-reg [10:0] addr_wr_3;
-//reg [10:0] addr_rd_1;
-//reg [10:0] addr_rd_2;
-//reg [10:0] addr_rd_3;
+reg mode;
+
+
+// 2 adresses for 2 row buffers
+//reg [10:0] addrw1;
+//reg [10:0] addrw2;
+
+
+
+//reg [11:0] hcount;
+
 
 // 3 output pix for 3 row buffers
-wire [DATA_WIDTH-1:0] data_rd_1;
-wire [DATA_WIDTH-1:0] data_rd_2;
-wire [DATA_WIDTH-1:0] data_rd_3;
 
-//data in addr for buffers
-reg [DATA_WIDTH-1:0] data_wr_1;
-reg [DATA_WIDTH-1:0] data_wr_2;
-reg [DATA_WIDTH-1:0] data_wr_3;
+wire [DATA_WIDTH-1:0] ram_pix1;
+wire [DATA_WIDTH-1:0] ram_pix2;
 
-// write enables 
-wire wea1; 
+
+//data in  addr
+reg [DATA_WIDTH-1:0] dina;
+
+reg wea1; 
 wire wea2; 
-wire wea3; 
 
-// wires for RGB values 
+
+reg [7:0] gaussian [2:0][2:0];
+reg [23:0] window [8:0];
+
+
 wire [7:0] red;
 wire [7:0] blu;
 wire [7:0] gre;
+reg [7:0] tred;
+reg [7:0] tblu;
+reg [7:0] tgre;
 reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
 reg [9:0] grey;
 
-// kernel
-reg [23:0] kernel[8:0];
-reg [23:0] kernel_output;
-// counter to determine which buffer to overwrite  
-integer counter;
+// random constant values
+// reg [5:0] brightness; 
 
-// hsync set to 1 to denote drawing a new row 
-// vsync set to 1 denote drawing a new frame 
-initial begin 
-    counter = 0;
-end 
+initial begin
+    wea1 <= 1;
+    mode <= 0;
+//    wea2 <= 0;
+////    gaussian[0][0] = 1; gaussian[0][1] = 2; gaussian[0][2] = 1;
+////    gaussian[1][0] = 1; gaussian[1][1] = 4; gaussian[1][2] = 1;
+////    gaussian[2][0] = 1; gaussian[2][1] = 2; gaussian[2][2] = 1;
+end
 
 assign {red, blu, gre} = i_vid_data;
+assign win =   {window[0], window[1], window[2],
+                window[3], window[4], window[5],
+                window[6], window[7], window[8]};
+                
+//assign wea2 = !wea1;
 
-// obtain kernel
-// 2200 for one row above, 4400 for one row above 
-//always @ (posedge clk) begin 
-//    kernel[0] <= kernel[1];
-//    kernel[1] <= kernel[2];
-//    reading from the buffer 
-    //    kernel[2] <= data_rd_1;
+// always@(posedge clk) begin 
+//    if(!n_rst) begin 
+//        brightness <= 0;
+//    end else begin 
+//        if ( brightness == 50 ) begin 
+//            brightness <= 0;
+//        end else begin 
+//            brightness <= brightness + 5;
+//        end
+//    end
+// end
 
-//    kernel[3] <= kernel[4];
-//    kernel[4] <= kernel[5];
-    //    kernel[5] <= data_rd_2;
-    
-//    kernel[6] <= kernel[7];
-//    kernel[7] <= kernel[8];
-    //    kernel[8] <= i_vid_data;
-//    blurring , implement switches for different operations
-//    kernel_output <= kernel[0]/9 + kernel[1]/9 + kernel[2]/9 + kernel[3]/9 + kernel[4]/9 + kernel[5]/9 + kernel[6]/9 + kernel[7]/9 + kernel[8]/9;
-//end
 always @ (posedge clk) begin
     if(!n_rst) begin
         o_vid_hsync <= 0;
         o_vid_vsync <= 0; 
         o_vid_VDE <= 0;
         o_vid_data <= 0;
-        addr_wr_1 <= 0;
-        addr_wr_2 <= 0;
-        addr_wr_3 <= 0;
-        data_wr_1 <= 0; 
-        data_wr_2 <= 0; 
-        data_wr_3 <= 0; 
+        hcount <= 0;
+
     end
     else begin
-        // delay sync and vde signals 
-        if (counter > 4044) begin
-            o_vid_hsync <= i_vid_hsync;
-            o_vid_vsync <= i_vid_vsync; 
-            o_vid_VDE <= i_vid_VDE;
-            // new frame 
-            if (i_vid_vsync == 1) 
-                counter <= 0;
-            // loop from the start 
-            if (addr_wr_1 >= 1919) 
-                addr_wr_1 <= 0; 
-            if (addr_wr_2 >= 1919) 
-                addr_wr_2 <= 0; 
+        o_vid_hsync <= i_vid_hsync;
+        o_vid_vsync <= i_vid_vsync; 
+        o_vid_VDE <= i_vid_VDE;
+        
+        
+        if (hcount >= 2200) begin
+            hcount <= 0;
+            mode <= !mode;
+            wea1 <= !wea1;
 
-            // buffer next row of data simultaneously 
-            data_wr_1 <= data_rd_2; 
-            data_wr_2 <= i_vid_data; 
-            // update the read
-            addr_wr_1 <= addr_wr_1 + 1;
-            addr_wr_2 <= addr_wr_2 + 1; 
-        end else begin 
-            // buffer first row 
-            if (counter < 2022) begin 
-                data_wr_1 <= i_vid_data; 
-                addr_wr_1 <= addr_wr_1 + 1;
-            // buffer second row 
-            end else begin 
-                data_wr_2 <= i_vid_data; 
-                addr_wr_2 <= addr_wr_2 + 1; 
-            end 
-            counter <= counter + 1; 
-        end 
+        end else
+            hcount <= hcount + 1;
             
             
-            
-            
-            // calculate cur_pixel value
-            // order of 1,2,3 / 2,3,1 / 3,1,2 
-           
-            
-// single pixel operations 
-//            case(sw)
-//            4'b0001:
-//                o_vid_data <= {blu, red, gre};
-//            4'b0011:
-//                // grayscale image
-//                o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
-//            4'b0010:
+        if (!mode) begin
+            data_rd_1 <= ram_pix1;
+            data_rd_2 <= ram_pix2;
+        end
+        else begin
+            data_rd_1 <= ram_pix2;
+            data_rd_2 <= ram_pix1;
+        end
+        
+        //changing row representation of row buffer
+        
+        
+        
+        
+        //window to apply kernel to
+        
+        window[0] <= window[1];
+        window[1] <= window[2];
+        window[2] <= data_rd_1;
+    
+        window[3] <= window[4];
+        window[4] <= window[5];
+        window[5] <= data_rd_2;
+        
+        window[6] <= window[7];
+        window[7] <= window[8];
+        window[8] <= i_vid_data;
+        
+        
+        //pixel operations
+        case(sw)
+            4'b0001:
+                o_vid_data <= {blu, red, gre};
+            4'b0010:
+                o_vid_data <= {8'b11111111-red, 8'b11111111-blu, 8'b11111111-gre};
+            4'b0011:
+            begin
+                re <= {2'd0,red};
+                bl <= {2'd0,blu};
+                gr <= {2'd0,gre};
+                grey <= (re+bl+gr)>>3;
+                o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
+            end
+//            4'b1000: 
 //            begin
-//                re <= {2'd0,red};
-//                bl <= {2'd0,blu};
-//                gr <= {2'd0,gre};
-//                grey <= (re+bl+gr)/8'd3;
-//                o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
+//                o_vid_data <= {red + brightness > 255 ? 255 : red + brightness, 
+//                               blu + brightness > 255 ? 255 : blu + brightness, 
+//                               gre + brightness > 255 ? 255 : gre + brightness};
 //            end
-//            default:
-//                o_vid_data <= i_vid_data;
-//            endcase
-        // buffer first two rows 
-        end else begin 
-            // write to buffer 
-            data_wr_1 <= i_vid_data;
-            addr_wr_1 <= addr_wr_1 + 1;
-            // first and last pixel is black
-//            if (i_vid_hsync == 1920) begin 
-//                addr1 <= addr1 + 1; 
-//                addr2 <= addr2 + 1; 
-//                addr3 <= addr3 + 1; 
-//                dina1 <= 0;
-//                dina2 <= 0;
-//                dina3 <= 0;
-//            end
-//            // data in is all 0 for first row
-//            if (i_vid_hsync == 1) begin 
-//                addr1 <= addr1 + 1;
-//                dina2 <= i_vid_VDE; 
-//                addr2 <= addr2 + 1;
-//            end else begin 
-//                dina3 <= i_vid_VDE; 
-//                addr3 <= addr3 + 1; 
-//            end
-            counter <= counter + 1; 
-        end 
+            4'b0100:
+            begin
+                tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
+                        window[3][7:0]/9 + window[4][7:0]/9 + window[5][7:0]/9 + 
+                        window[6][7:0]/9 + window[7][7:0]/9 + window[8][7:0]/9;
+                
+                tblu <= window[0][15:8]/9 + window[1][15:8]/9 + window[2][15:8]/9 +
+                        window[3][15:8]/9 + window[4][15:8]/9 + window[5][15:8]/9 +
+                        window[6][15:8]/9 + window[7][15:8]/9 + window[8][15:8]/9;
+                
+                tred <= window[0][23:16]/9 + window[1][23:16]/9 + window[2][23:16]/9 + 
+                        window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
+                        window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
+                        
+                 o_vid_data <= {tred, tblu, tgre};
+            end
+            4'b0101:
+            begin
+                tgre <= window[0][7:0] - window[2][7:0] + 
+                        window[3][7:0]*2 - window[5][7:0]*2 + 
+                        window[6][7:0] - window[8][7:0];
+                
+                tblu <= window[0][15:8] - window[2][15:8] +
+                        window[3][15:8]*2 - window[5][15:8]*2 +
+                        window[6][15:8] - window[8][15:8];
+                
+                tred <= window[0][23:16] - window[2][23:16] + 
+                        window[3][23:16]*2 - window[5][23:16]*2 + 
+                        window[6][23:16] - window[8][23:16];
+                        
+                        
+                        
+                o_vid_data <= {tred>>3, tblu>>3, tgre>>3};
+            end
+            4'b0110:
+            begin
+                tgre <= window[4][7:0];
+                
+                tblu <= window[4][15:8];
+                
+                tred <= window[4][23:16];
+                
+                 o_vid_data <= {tred, tblu, tgre};
+            end
+            
+            4'b0111:
+            begin
+                tgre <= window[6][7:0] - window[8][7:0];
+                
+                tblu <= window[6][15:8] - window[8][15:8];
+                
+                tred <= window[6][23:16] - window[8][23:16];
+                        
+                        
+                        
+                o_vid_data <= {tred>>1, tblu>>1, tgre>>1};
+            end
+            
+            default:
+                o_vid_data <= i_vid_data;
+        endcase
+
+        
+
     end
 end
 
-// port A for write operations, port B for read operations
 blk_mem_gen_0 inst0(
-    .clka(clk), 
-    .wea(wea1),
-    .addra(addr_wr_1),
-    .dina(data_wr_1),
-    .clkb(clk),
-    .addrb(addr_wr_1 + 2),
-    .doutb(data_rd_1)
+        .clka(clk),
+        .clkb(clk),
+        .wea(wea1),
+        .addra(hcount),
+        .dina(i_vid_data),
+        .addrb(hcount+2),
+        .doutb(ram_pix1)
 );
-
-//blk_mem_gen_0 inst0(
-//    .clka(clk), 
-//    .wea(wea1),
-//    .addra(addr1),
-//    .dina(dina1),
-//    .douta(ram_pix1)
-//);
-
 blk_mem_gen_1 inst1(
-    .clka(clk), 
-    .wea(wea1),
-    .addra(addr_wr_2),
-    .dina(data_wr_2),
-    .clkb(clk),
-    .addrb(addr_wr_2 + 2),
-    .doutb(data_rd_2)
+        .clka(clk),
+        .clkb(clk),
+        .wea(!wea1),
+        .addra(hcount),
+        .dina(i_vid_data),
+        .addrb(hcount+2),
+        .doutb(ram_pix2)
 );
 
-blk_mem_gen_2 inst2(
-    .clka(clk), 
-    .wea(wea1),
-    .addra(addr_wr_3),
-    .dina(data_wr_3),
-    .clkb(clk),
-    .addrb(addr_wr_3 +2),
-    .doutb(data_rd_3)
-);
+//randomiser random_inst(
+//        .clk(clk),
+//        .n_rst(n_rst),
+//        .brightness(brightness)
+//); 
 
 
 endmodule
