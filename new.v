@@ -97,10 +97,13 @@ reg [7:0] tgre;
 reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
+
+reg [9:0] Y;
+reg [9:0] U;
+reg [9:0] V;
+
 reg [9:0] grey;
 
-// random constant values
-// reg [5:0] brightness; 
 
 initial begin
     wea1 <= 1;
@@ -117,18 +120,12 @@ assign win =   {window[0], window[1], window[2],
                 window[6], window[7], window[8]};
                 
 //assign wea2 = !wea1;
+// random constant values
+wire [5:0] brightness; 
+reg [9:0] vcount;
+wire line_end = (hcount == 2200); 
+wire frame_end = (vcount == 931); 
 
-// always@(posedge clk) begin 
-//    if(!n_rst) begin 
-//        brightness <= 0;
-//    end else begin 
-//        if ( brightness == 50 ) begin 
-//            brightness <= 0;
-//        end else begin 
-//            brightness <= brightness + 5;
-//        end
-//    end
-// end
 
 always @ (posedge clk) begin
     if(!n_rst) begin
@@ -137,23 +134,27 @@ always @ (posedge clk) begin
         o_vid_VDE <= 0;
         o_vid_data <= 0;
         hcount <= 0;
-
+        vcount <= 0;
     end
     else begin
         o_vid_hsync <= i_vid_hsync;
         o_vid_vsync <= i_vid_vsync; 
         o_vid_VDE <= i_vid_VDE;
         
-        
+        // curr_x
         if (hcount >= 2200) begin
             hcount <= 0;
             mode <= !mode;
             wea1 <= !wea1;
-
         end else
             hcount <= hcount + 1;
             
-            
+        // cur_y 
+        if (frame_end) 
+            vcount <= 0;
+        else if (line_end) 
+            vcount <= vcount + 1; 
+   
         if (!mode) begin
             data_rd_1 <= ram_pix1;
             data_rd_2 <= ram_pix2;
@@ -183,7 +184,7 @@ always @ (posedge clk) begin
         window[8] <= i_vid_data;
         
         
-        //pixel operations
+
         case(sw)
             4'b0001:
                 o_vid_data <= {blu, red, gre};
@@ -197,12 +198,58 @@ always @ (posedge clk) begin
                 grey <= (re+bl+gr)>>3;
                 o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
             end
-//            4'b1000: 
-//            begin
-//                o_vid_data <= {red + brightness > 255 ? 255 : red + brightness, 
-//                               blu + brightness > 255 ? 255 : blu + brightness, 
-//                               gre + brightness > 255 ? 255 : gre + brightness};
-//            end
+            // brightness increase
+            4'b1000: 
+            begin
+//                re <= {red + brightness > 255 ? 255 : red + brightness};
+//                bl <= {blu + brightness > 255 ? 255 : blu + brightness};
+//                gr <= {gre + brightness > 255 ? 255 : gre + brightness}; 
+                re <= (red * 70 / 100 > 255 ? 255 : red * 70 / 100);
+                bl <= (blu *  70 / 100 > 255 ? 255 : blu *  70 / 100);
+                gr <= (gre * 70 / 100 > 255 ? 255 : gre * 70 / 100); 
+                o_vid_data <= {re,bl,gr};
+            end
+            // brightness increase
+            4'b1010: 
+            begin 
+                re <= (red + brightness > 255 ? 255 : red + brightness);
+                bl <= (blu + brightness > 255 ? 255 : blu + brightness);
+                gr <= (gre + brightness > 255 ? 255 : gre + brightness); 
+                o_vid_data <= {re,bl,gr};
+            end
+            // RGB to YUV conversion
+            4'b1100:
+            begin 
+                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
+                bl <= (439 * (blu - re) + 128) / 256;
+                gr <= (439 * (red - re) + 128) / 256;
+                o_vid_data <= {re ,bl,gr};
+            end
+            // YUV test
+            4'b1110:
+            begin 
+                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
+                bl <= (439 * (blu - re) + 128) / 256;
+                gr <= (439 * (red - re) + 128) / 256;
+                o_vid_data <= {re *255,bl *255,gr * 255};
+            end
+            // YUV test
+            4'b1111:
+            begin 
+                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
+                bl <= (439 * (blu - re) + 128) / 256;
+                gr <= (439 * (red - re) + 128) / 256;
+                Y  <= re + ((359 * gr) / 256);
+                U  <= re - ((88 * bl) / 256) - ((183 * gr) / 256);
+                V  <= re + ((454 * bl) / 256);
+                o_vid_data <= {Y,U,V};
+            end 
+            // drawing a sprite
+            4'b1001: 
+            begin 
+                if ((hcount >= 300) && (hcount <= 500) && (vcount >= 50) && (vcount <= 100))
+                    o_vid_data <= {red,red,red};
+            end
             4'b0100:
             begin
                 tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
@@ -289,11 +336,11 @@ blk_mem_gen_1 inst1(
         .doutb(ram_pix2)
 );
 
-//randomiser random_inst(
-//        .clk(clk),
-//        .n_rst(n_rst),
-//        .brightness(brightness)
-//); 
+randomiser random_inst(
+        .clk(clk),
+        .n_rst(n_rst),
+        .brightness(brightness)
+); 
 
 
 endmodule
