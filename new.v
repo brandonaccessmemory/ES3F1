@@ -98,10 +98,11 @@ reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
 
+    // new
 reg [9:0] Y;
 reg [9:0] U;
 reg [9:0] V;
-
+    // new
 reg [9:0] grey;
 
 
@@ -120,12 +121,13 @@ assign win =   {window[0], window[1], window[2],
                 window[6], window[7], window[8]};
                 
 //assign wea2 = !wea1;
+// new
 // random constant values
 wire [5:0] brightness; 
 reg [9:0] vcount;
 wire line_end = (hcount == 2200); 
 wire frame_end = (vcount == 931); 
-
+// new
 
 always @ (posedge clk) begin
     if(!n_rst) begin
@@ -140,7 +142,7 @@ always @ (posedge clk) begin
         o_vid_hsync <= i_vid_hsync;
         o_vid_vsync <= i_vid_vsync; 
         o_vid_VDE <= i_vid_VDE;
-        
+        // new
         // curr_x
         if (hcount >= 2200) begin
             hcount <= 0;
@@ -154,7 +156,7 @@ always @ (posedge clk) begin
             vcount <= 0;
         else if (line_end) 
             vcount <= vcount + 1; 
-   
+        // new
         if (!mode) begin
             data_rd_1 <= ram_pix1;
             data_rd_2 <= ram_pix2;
@@ -198,7 +200,7 @@ always @ (posedge clk) begin
                 grey <= (re+bl+gr)>>3;
                 o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
             end
-            // brightness increase
+            // brightness increase new
             4'b1000: 
             begin
 //                re <= {red + brightness > 255 ? 255 : red + brightness};
@@ -249,7 +251,10 @@ always @ (posedge clk) begin
             begin 
                 if ((hcount >= 300) && (hcount <= 500) && (vcount >= 50) && (vcount <= 100))
                     o_vid_data <= {red,red,red};
+                else 
+                    o_vid_data <= {red,blu,gre};
             end
+            //
             4'b0100:
             begin
                 tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
@@ -336,6 +341,7 @@ blk_mem_gen_1 inst1(
         .doutb(ram_pix2)
 );
 
+// new
 randomiser random_inst(
         .clk(clk),
         .n_rst(n_rst),
