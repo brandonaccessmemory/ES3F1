@@ -54,7 +54,8 @@ module colour_change #
     /*
      * Control
      */
-    input wire [3:0]            sw
+    input wire [3:0]            sw,
+    input wire [3:0]            btn
 );
 
 wire enable;
@@ -91,21 +92,23 @@ reg [23:0] window [8:0];
 wire [7:0] red;
 wire [7:0] blu;
 wire [7:0] gre;
+
 reg [7:0] tred;
 reg [7:0] tblu;
 reg [7:0] tgre;
+
 reg [9:0] re;
 reg [9:0] bl;
 reg [9:0] gr;
 
-    // new
 reg [9:0] Y;
 reg [9:0] U;
 reg [9:0] V;
-    // new
+
 reg [9:0] grey;
 
-
+reg [23:0] pos_x;
+reg button_prev; 
 initial begin
     wea1 <= 1;
     mode <= 0;
@@ -121,13 +124,15 @@ assign win =   {window[0], window[1], window[2],
                 window[6], window[7], window[8]};
                 
 //assign wea2 = !wea1;
-// new
 // random constant values
 wire [5:0] brightness; 
-reg [9:0] vcount;
-wire line_end = (hcount == 2200); 
-wire frame_end = (vcount == 931); 
-// new
+reg [10:0] vcount;
+
+wire line_end = (hcount == 2199); 
+wire frame_end = (vcount == 1125); 
+
+reg[6:0] brightness_factor; 
+
 
 always @ (posedge clk) begin
     if(!n_rst) begin
@@ -137,14 +142,15 @@ always @ (posedge clk) begin
         o_vid_data <= 0;
         hcount <= 0;
         vcount <= 0;
+        brightness_factor <= 100;
     end
     else begin
         o_vid_hsync <= i_vid_hsync;
         o_vid_vsync <= i_vid_vsync; 
         o_vid_VDE <= i_vid_VDE;
-        // new
+        
         // curr_x
-        if (hcount >= 2200) begin
+        if (hcount >= 2199) begin
             hcount <= 0;
             mode <= !mode;
             wea1 <= !wea1;
@@ -156,7 +162,7 @@ always @ (posedge clk) begin
             vcount <= 0;
         else if (line_end) 
             vcount <= vcount + 1; 
-        // new
+   
         if (!mode) begin
             data_rd_1 <= ram_pix1;
             data_rd_2 <= ram_pix2;
@@ -200,43 +206,76 @@ always @ (posedge clk) begin
                 grey <= (re+bl+gr)>>3;
                 o_vid_data <= {grey[7:0], grey[7:0], grey[7:0]};
             end
-            // brightness increase new
+            // horizontal split screen 
+            4'b0110:
+            begin 
+                if (vcount >= 562)
+                    o_vid_data <= {red,red,red}; 
+                else 
+                    o_vid_data <= {red,blu,gre}; 
+            
+            end 
+            // quad split screen 
+            4'b0011: 
+            begin 
+                // bottom right
+                if ((vcount >= 562) && (hcount >= 1100)) 
+                   o_vid_data <= i_vid_data;
+                // bottom left 
+                if ((vcount >= 562) && (hcount <= 1100)) 
+                   o_vid_data <= {blu,gre,blu};
+                // top right 
+                if ((vcount <= 562) && (hcount >= 1100)) 
+                   o_vid_data <= {red,gre,red};
+                // top left
+                if ((vcount <= 562) && (hcount <= 1100)) 
+                   o_vid_data <= {red,gre,blu};
+            end
+            // brightness with buttons
             4'b1000: 
             begin
-//                re <= {red + brightness > 255 ? 255 : red + brightness};
-//                bl <= {blu + brightness > 255 ? 255 : blu + brightness};
-//                gr <= {gre + brightness > 255 ? 255 : gre + brightness}; 
-                re <= (red * 70 / 100 > 255 ? 255 : red * 70 / 100);
-                bl <= (blu *  70 / 100 > 255 ? 255 : blu *  70 / 100);
-                gr <= (gre * 70 / 100 > 255 ? 255 : gre * 70 / 100); 
-                o_vid_data <= {re,bl,gr};
+                button_prev <= btn[1]; 
+                // brightness reset
+                if (btn[0]) 
+                    brightness_factor <= 100;
+                                    // decrease brightness, high when button_prev is low and btn is high 
+                else if (!button_prev && btn[1]) begin
+                    brightness_factor <= brightness_factor - 5; 
+                    // min limit for brightness
+                    if (brightness_factor <= 10)
+                        brightness_factor <= 10;
+                    
+                // increase brightness
+                end else if (btn[2]) begin 
+                    brightness_factor <= brightness_factor + 5;
+                    // max limit for brightness 
+                    if (brightness_factor >= 200) 
+                        brightness_factor <= 200; 
+                end
+                    
+                tred <= (red * brightness_factor / 100 > 255 ? 255 : red * brightness_factor / 100);
+                tblu <= (blu * brightness_factor / 100 > 255 ? 255 : blu * brightness_factor / 100);
+                tgre <= (gre * brightness_factor / 100 > 255 ? 255 : gre * brightness_factor / 100); 
+                o_vid_data <= {tred,tblu,tgre};
             end
-            // brightness increase
+            // brightness increase with randomiser
             4'b1010: 
             begin 
-                re <= (red + brightness > 255 ? 255 : red + brightness);
-                bl <= (blu + brightness > 255 ? 255 : blu + brightness);
-                gr <= (gre + brightness > 255 ? 255 : gre + brightness); 
-                o_vid_data <= {re,bl,gr};
+                tred <= (red + brightness > 255 ? 255 : red + brightness);
+                tblu <= (blu + brightness > 255 ? 255 : blu + brightness);
+                tgre <= (gre + brightness > 255 ? 255 : gre + brightness); 
+                o_vid_data <= {tred,tblu,tgre};
             end
-            // RGB to YUV conversion
+
             4'b1100:
             begin 
-                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
-                bl <= (439 * (blu - re) + 128) / 256;
-                gr <= (439 * (red - re) + 128) / 256;
-                o_vid_data <= {re ,bl,gr};
+                if ((hcount >= 300) && (hcount <= 500))
+                    o_vid_data <= {50,50,50};
+                else 
+                    o_vid_data <= {red,blu,gre};
             end
             // YUV test
             4'b1110:
-            begin 
-                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
-                bl <= (439 * (blu - re) + 128) / 256;
-                gr <= (439 * (red - re) + 128) / 256;
-                o_vid_data <= {re *255,bl *255,gr * 255};
-            end
-            // YUV test
-            4'b1111:
             begin 
                 re <= (299 * red + 587 * gre + 114 * blu) / 1000;
                 bl <= (439 * (blu - re) + 128) / 256;
@@ -245,16 +284,35 @@ always @ (posedge clk) begin
                 U  <= re - ((88 * bl) / 256) - ((183 * gr) / 256);
                 V  <= re + ((454 * bl) / 256);
                 o_vid_data <= {Y,U,V};
+            end
+            // YUV test
+            4'b1111:
+            begin 
+                tred <= (299 * red + 587 * gre + 114 * blu) / 1000;
+                tblu <= (439 * (blu - tred) + 128) / 256;
+                tgre <= (439 * (red - tred) + 128) / 256;
+                Y  <= tred + ((359 * tgre) / 256);
+                U  <= tred - ((88 * tblu) / 256) - ((183 * tgre) / 256);
+                V  <= tred + ((454 * tblu) / 256);
+                o_vid_data <= {Y,U,V};
+
             end 
             // drawing a sprite
             4'b1001: 
             begin 
-                if ((hcount >= 300) && (hcount <= 500) && (vcount >= 50) && (vcount <= 100))
-                    o_vid_data <= {red,red,red};
+                // reset 
+                if (btn[0])
+                    pos_x <= 0;
+                if (btn[3]) begin
+                    pos_x <= pos_x + 1;
+                    if (pos_x >= 2199)
+                        pos_x <= pos_x; 
+                end 
+                if ((hcount >= 300 + pos_x) && (hcount <= 500 + pos_x) && (vcount >= 50) && (vcount <= 100))
+                    o_vid_data <= {50,50,50};
                 else 
                     o_vid_data <= {red,blu,gre};
             end
-            //
             4'b0100:
             begin
                 tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
@@ -341,7 +399,6 @@ blk_mem_gen_1 inst1(
         .doutb(ram_pix2)
 );
 
-// new
 randomiser random_inst(
         .clk(clk),
         .n_rst(n_rst),
