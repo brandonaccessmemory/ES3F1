@@ -299,20 +299,22 @@ always @ (posedge clk) begin
             end
             4'b0100:
             begin
-                tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
-                        window[3][7:0]/9 + window[4][7:0]/9 + window[5][7:0]/9 + 
-                        window[6][7:0]/9 + window[7][7:0]/9 + window[8][7:0]/9;
+                             
+                o_vid_data <= kernel_output;
+                // tgre <= window[0][7:0]/9 + window[1][7:0]/9 + window[2][7:0]/9 + 
+                //         window[3][7:0]/9 + window[4][7:0]/9 + window[5][7:0]/9 + 
+                //         window[6][7:0]/9 + window[7][7:0]/9 + window[8][7:0]/9;
                 
-                tblu <= window[0][15:8]/9 + window[1][15:8]/9 + window[2][15:8]/9 +
-                        window[3][15:8]/9 + window[4][15:8]/9 + window[5][15:8]/9 +
-                        window[6][15:8]/9 + window[7][15:8]/9 + window[8][15:8]/9;
+                // tblu <= window[0][15:8]/9 + window[1][15:8]/9 + window[2][15:8]/9 +
+                //         window[3][15:8]/9 + window[4][15:8]/9 + window[5][15:8]/9 +
+                //         window[6][15:8]/9 + window[7][15:8]/9 + window[8][15:8]/9;
                 
-                tred <= window[0][23:16]/9 + window[1][23:16]/9 + window[2][23:16]/9 + 
-                        window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
-                        window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
+                // tred <= window[0][23:16]/9 + window[1][23:16]/9 + window[2][23:16]/9 + 
+                //         window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
+                //         window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
                         
-                 o_vid_data <= kernel_output;
-                kernel_output <= {tred,tblu,tgre};
+                //  o_vid_data <= kernel_output;
+                // kernel_output <= {tred,tblu,tgre};
             end
             4'b0101:
             begin
