@@ -108,7 +108,8 @@ reg [9:0] V;
 reg [9:0] grey;
 
 reg [23:0] pos_x;
-reg button_prev; 
+reg button_prev_1;
+reg button_prev_2;
 initial begin
     wea1 <= 1;
     mode <= 0;
@@ -234,19 +235,20 @@ always @ (posedge clk) begin
             // brightness with buttons
             4'b1000: 
             begin
-                button_prev <= btn[1]; 
+                button_prev_1 <= btn[1];
+                button_prev_2 <= btn[2];
                 // brightness reset
                 if (btn[0]) 
                     brightness_factor <= 100;
                                     // decrease brightness, high when button_prev is low and btn is high 
-                else if (!button_prev && btn[1]) begin
+                else if (!button_prev_1 && btn[1]) begin
                     brightness_factor <= brightness_factor - 5; 
                     // min limit for brightness
                     if (brightness_factor <= 10)
                         brightness_factor <= 10;
                     
                 // increase brightness
-                end else if (btn[2]) begin 
+                end else if (!button_prev_2 && btn[2]) begin 
                     brightness_factor <= brightness_factor + 5;
                     // max limit for brightness 
                     if (brightness_factor >= 200) 
