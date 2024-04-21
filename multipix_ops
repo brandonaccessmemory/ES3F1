@@ -1,0 +1,156 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 21.04.2024 20:48:08
+// Design Name: 
+// Module Name: multipixOps
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module multipixOps(
+    input clk,
+    input n_rst,
+    input [23:0] window0,
+    input [23:0] window1,
+    input [23:0] window2,
+    input [23:0] window3,
+    input [23:0] window4,
+    input [23:0] window5,
+    input [23:0] window6,
+    input [23:0] window7,
+    input [23:0] window8,
+    input [3:0] sw,
+    output [23:0] kernel_output
+);
+    
+    
+reg [10:0] tgre, tblu, tred;
+reg [10:0] gr, bl, re;
+
+reg [23:0] kernel_output;
+
+ always@(posedge clk) begin 
+    if(!n_rst) begin 
+        kernel_output <= 0;
+    end else begin 
+        case(sw)
+            4'b0100: // blur
+            begin
+                tgre <= window0[7:0]/9 + window1[7:0]/9 + window2[7:0]/9 + 
+                        window3[7:0]/9 + window4[7:0]/9 + window5[7:0]/9 + 
+                        window6[7:0]/9 + window7[7:0]/9 + window8[7:0]/9;
+                
+                tblu <= window0[15:8]/9 + window1[15:8]/9 + window2[15:8]/9 +
+                        window3[15:8]/9 + window4[15:8]/9 + window5[15:8]/9 +
+                        window6[15:8]/9 + window7[15:8]/9 + window8[15:8]/9;
+                
+                tred <= window0[23:16]/9 + window1[23:16]/9 + window2[23:16]/9 + 
+                        window3[23:16]/9 + window4[23:16]/9 + window5[23:16]/9 + 
+                        window6[23:16]/9 + window7[23:16]/9 + window8[23:16]/9;
+                        
+                kernel_output <= {tred[7:0], tblu[7:0], tgre[7:0]};
+            end
+            4'b0101: // vert sobel
+            begin
+                tgre <= window0[7:0] - window2[7:0] + 
+                        window3[7:0]*2 - window5[7:0]*2 + 
+                        window6[7:0] - window8[7:0];
+                
+                tblu <= window0[15:8] - window2[15:8] +
+                        window3[15:8]*2 - window5[15:8]*2 +
+                        window6[15:8] - window8[15:8];
+                
+                tred <= window0[23:16] - window2[23:16] + 
+                        window3[23:16]*2 - window5[23:16]*2 + 
+                        window6[23:16] - window8[23:16];
+                        
+                        
+                re <= (tred>255) ? 255:tred>>2;
+                bl <= (tblu>255) ? 255:tblu>>2;
+                gr <= (tgre>255) ? 255:tgre>>2;
+                kernel_output <= {re[7:0], bl[7:0], gr[7:0]};
+               
+            end
+            4'b0110: // middle pixel
+            begin
+                tgre <= window4[7:0];
+                
+                tblu <= window4[15:8];
+                
+                tred <= window4[23:16];
+                
+                 kernel_output<= {tred[7:0], tblu[7:0], tgre[7:0]};
+            end
+            
+            4'b1001: // 
+            begin
+                tgre <=                  window1[7:0]                  + 
+                        window3[7:0] - 4*window4[7:0] + window5[7:0] + 
+                                        window7[7:0]                   ;
+                
+                tblu <=                  window1[15:8]                  + 
+                        window3[15:8] - 4*window4[15:8] + window5[15:8] + 
+                                         window7[15:8]                   ;
+                
+                tred <=                  window1[23:16]                  + 
+                        window3[23:16] - 4*window4[23:16] + window5[23:16] + 
+                                         window7[23:16]                   ;
+                     
+                re <= (tred>255) ? 255:tred>>2;
+                bl <= (tblu>255) ? 255:tblu>>2;
+                gr <= (tgre>255) ? 255:tgre>>2;
+                kernel_output <= {re[7:0], bl[7:0], gr[7:0]};
+          end
+          
+          4'b0111: // horisontal sobel gy
+            begin
+                tgre <= (window0[7:0] + 2*window1[7:0] + window2[7:0] 
+                       - window6[7:0] - 2*window7[7:0] - window8[7:0]);
+                
+                tblu <= (window0[15:8] + 2*window1[15:8] + window2[15:8]
+                       - window6[15:8] - 2*window7[15:8] - window8[15:8]);
+                
+                tred <= (window0[23:16] + 2*window1[23:16] + window2[23:16]  
+                       - window6[23:16] - 2*window7[23:16] - window8[23:16]);
+                        
+                re <= (tred>255) ? 255:tred>>2;
+                bl <= (tblu>255) ? 255:tblu>>2;
+                gr <= (tgre>255) ? 255:tgre>>2;
+                kernel_output <= {re[7:0], bl[7:0], gr[7:0]};
+
+            end
+          
+          4'b1000: // normal draw using first pix for testing
+            begin
+                tgre <= window1[7:0];
+                
+                tblu <= window1[15:8];
+                
+                tred <= window1[23:16];
+                
+                kernel_output <= {tred[7:0], tblu[7:0], tgre[7:0]};
+
+
+            end 
+            
+            default:
+                kernel_output <= 0;
+                
+            endcase
+            
+    end
+end
+endmodule
