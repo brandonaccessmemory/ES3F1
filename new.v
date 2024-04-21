@@ -311,7 +311,8 @@ always @ (posedge clk) begin
                         window[3][23:16]/9 + window[4][23:16]/9 + window[5][23:16]/9 + 
                         window[6][23:16]/9 + window[7][23:16]/9 + window[8][23:16]/9;
                         
-                 o_vid_data <= {tred, tblu, tgre};
+                 o_vid_data <= kernel_output;
+                kernel_output <= {tred,tblu,tgre};
             end
             4'b0101:
             begin
@@ -388,6 +389,19 @@ randomiser random_inst(
         .n_rst(n_rst),
         .brightness(brightness)
 ); 
+
+    multi_pixel inst2(
+        .clk(clk),
+        .n_rst(n_rst), 
+        .window_0(window[0]),
+        .window_0(window[0]),
+        .window_0(window[0]),
+        .window_0(window[0]),
+        .window_0(window[0]),
+        .window_0(window[0]),
+        .sw(sw),
+        .output_1(kernel_output),
+    ):
 
 
 endmodule
