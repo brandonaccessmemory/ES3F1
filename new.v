@@ -267,24 +267,6 @@ always @ (posedge clk) begin
                 o_vid_data <= {tred,tblu,tgre};
             end
 
-            4'b1100:
-            begin 
-                if ((hcount >= 300) && (hcount <= 500))
-                    o_vid_data <= {50,50,50};
-                else 
-                    o_vid_data <= {red,blu,gre};
-            end
-            // YUV test
-            4'b1110:
-            begin 
-                re <= (299 * red + 587 * gre + 114 * blu) / 1000;
-                bl <= (439 * (blu - re) + 128) / 256;
-                gr <= (439 * (red - re) + 128) / 256;
-                Y  <= re + ((359 * gr) / 256);
-                U  <= re - ((88 * bl) / 256) - ((183 * gr) / 256);
-                V  <= re + ((454 * bl) / 256);
-                o_vid_data <= {Y,U,V};
-            end
             // YUV test
             4'b1111:
             begin 
