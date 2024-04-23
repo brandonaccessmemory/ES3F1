@@ -133,7 +133,7 @@ reg [23:0] kernel_output;
 
             end
           
-          4'b1000: // normal draw using first pix for testing
+          4'b1000: // normal draw using top mid pix for testing
             begin
                 tgre <= window1[7:0];
                 
