@@ -1,0 +1,103 @@
+
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 27.03.2024 16:21:47
+// Design Name: 
+// Module Name: colour_change_tb
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module colour_change_tb();
+
+reg clk;
+reg n_rst;
+reg [3:0]sw;
+reg i_vid_hsync;
+reg i_vid_vsync;
+reg i_vid_VDE;
+reg [23:0] i_vid_data;
+
+reg [7:0] red;
+reg [7:0] blu;
+reg [7:0] gre;
+
+wire [23:0] o_vid_data;
+wire o_vid_hsync;
+wire o_vid_vsync;
+wire o_vid_VDE;
+
+wire [215:0] window;
+wire [11:0] hcount;
+
+wire [23:0] ram_pix1;
+wire [23:0] ram_pix2;
+
+initial begin
+    #1
+    clk = 0;
+    n_rst = 0;
+    sw = 4'b0000;
+    red = 8'h0;
+    blu = 8'h0;
+    gre = 8'h0;
+    i_vid_data = {red, blu, gre};
+    i_vid_hsync = 0;
+    i_vid_vsync = 0;
+    i_vid_VDE = 0;
+    #10
+    n_rst = 1;
+end 
+
+always begin
+    #1 
+    clk = ~clk;
+//    red = red + 1;
+//    blu = blu + 1;
+//    gre = gre + 1;
+    i_vid_data <= i_vid_data+1;//{red, blu, gre};
+    if (hcount >= 2200)
+        i_vid_data <= 0;
+//    sw = sw+1;
+end
+
+colour_change colour_change_inst(
+    .clk(clk),
+    .n_rst(n_rst),
+
+     //* Pixel inputs
+
+    .i_vid_data(i_vid_data),
+    .i_vid_hsync(i_vid_hsync),
+    .i_vid_vsync(i_vid_vsync),
+    .i_vid_VDE(i_vid_VDE),
+
+    //* Pixel output
+
+    .o_vid_data(o_vid_data),
+    .o_vid_hsync(o_vid_hsync),
+    .o_vid_vsync(o_vid_vsync),
+    .o_vid_VDE(o_vid_VDE),
+    
+    .win(window),
+    .hcount(hcount),
+    .ram_pix1(ram_pix1),
+    .ram_pix2(ram_pix2),
+
+   
+    .sw(sw)
+);
+endmodule
